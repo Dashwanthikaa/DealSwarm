@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DealSwarm — Multi-Agent Deal Negotiation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1013;
+    --bg-raised:#171A1F;
+    --bg-card:#1C2028;
+    --border:#2A2F3A;
+    --text:#F2F0EA;
+    --text-dim:#9BA1AE;
+    --text-faint:#5C6270;
+    --gold:#E3A33E;
+    --gold-dim:#8A6B32;
+    --teal:#45D0A0;
+    --violet:#9C8CF2;
+    --c-business:#7C93F0;
+    --c-farming:#7FBE6A;
+    --c-medicine:#5FC9D6;
+    --c-education:#B394E0;
+    --radius:14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  #app{position:relative; min-height:100vh; display:flex; flex-direction:column;}
+
+  /* ---------- topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 32px;
+    position:relative; z-index:10;
+  }
+  .topbar-mark{
+    font-family:'Fraunces', serif; font-weight:600; font-size:18px;
+    letter-spacing:0.01em; cursor:pointer; display:flex; align-items:center; gap:8px;
+  }
+  .topbar-mark .dot{width:7px; height:7px; border-radius:50%; background:var(--gold); display:inline-block;}
+  .crumbs{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--text-faint); display:flex; gap:8px; align-items:center;}
+  .crumbs span{cursor:pointer; transition:color .15s;}
+  .crumbs span:hover{color:var(--text);}
+  .crumbs .sep{color:var(--text-faint); cursor:default;}
+  .crumbs .current{color:var(--gold); cursor:default;}
+
+  /* ---------- views ---------- */
+  .view{display:none; flex:1; flex-direction:column;}
+  .view.active{display:flex;}
+
+  /* ---------- BRAND VIEW ---------- */
+  #view-brand{align-items:center; justify-content:center; position:relative; padding:40px 24px 60px; text-align:center; min-height:88vh;}
+  .swarm-field{position:absolute; inset:0; overflow:hidden; pointer-events:none;}
+  .particle{
+    position:absolute; border-radius:50%; background:var(--gold);
+    opacity:0.55; filter:blur(0.3px);
+  }
+  .hero-inner{position:relative; z-index:2; max-width:740px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.14em;
+    color:var(--text-faint); text-transform:uppercase; margin-bottom:22px;
+  }
+  .wordmark{
+    font-family:'Fraunces', serif; font-weight:600; font-size:clamp(48px,9vw,92px);
+    line-height:0.98; letter-spacing:-0.01em;
+  }
+  .wordmark .accent{color:var(--gold); font-style:italic; font-weight:500;}
+  .tagline{
+    font-size:18px; color:var(--text-dim); max-width:500px; margin:26px auto 0; line-height:1.55;
+  }
+  .agent-chips{display:flex; gap:10px; justify-content:center; margin:34px 0 18px; flex-wrap:wrap;}
+  .agent-chip{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; padding:7px 14px;
+    border:1px solid var(--border); border-radius:100px; color:var(--text-dim);
+    display:flex; align-items:center; gap:7px;
+  }
+  .agent-chip .dot{width:6px; height:6px; border-radius:50%;}
+  .feature-strip{
+    display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:36px;
+  }
+  .feature-pill{
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px; padding:5px 11px;
+    border-radius:100px; background:var(--bg-card); color:var(--text-faint);
+    letter-spacing:0.02em;
+  }
+  .cta-btn{
+    font-family:'Inter', sans-serif; font-weight:600; font-size:15px;
+    background:var(--gold); color:#171004; border:none; padding:16px 34px;
+    border-radius:100px; cursor:pointer; transition:transform .15s, box-shadow .15s;
+    box-shadow:0 8px 24px -8px rgba(227,163,62,0.5);
+  }
+  .cta-btn:hover{transform:translateY(-2px); box-shadow:0 12px 30px -8px rgba(227,163,62,0.6);}
+  .brand-footer{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--text-faint);
+    margin-top:46px; letter-spacing:0.05em;
+  }
+
+  /* ---------- DOMAINS VIEW ---------- */
+  .section-wrap{max-width:980px; margin:0 auto; padding:56px 28px 80px; width:100%;}
+  .section-head{margin-bottom:40px;}
+  .section-head h1{font-family:'Fraunces', serif; font-weight:600; font-size:clamp(30px,4vw,42px);}
+  .section-head p{color:var(--text-dim); font-size:16px; margin-top:10px; max-width:520px;}
+  .domain-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:18px;}
+  @media(max-width:680px){.domain-grid{grid-template-columns:1fr;}}
+  .domain-card{
+    background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:26px; cursor:pointer; text-align:left; transition:border-color .18s, transform .18s;
+    position:relative; overflow:hidden;
+  }
+  .domain-card:hover{transform:translateY(-3px);}
+  .domain-card .icon-wrap{
+    width:44px; height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+    margin-bottom:18px;
+  }
+  .domain-card h3{font-family:'Fraunces', serif; font-weight:600; font-size:20px; margin-bottom:8px;}
+  .domain-card p{color:var(--text-dim); font-size:13.5px; line-height:1.5;}
+  .domain-card .go{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--text-faint);
+    margin-top:18px; display:flex; align-items:center; gap:5px;
+  }
+  .domain-card.soon{opacity:0.45; cursor:default;}
+  .domain-card.soon:hover{transform:none;}
+
+  /* ---------- ROLES VIEW ---------- */
+  .back-link{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--text-dim);
+    cursor:pointer; display:inline-flex; align-items:center; gap:6px; margin-bottom:28px;
+    transition:color .15s;
+  }
+  .back-link:hover{color:var(--text);}
+  .role-domain-tag{
+    display:inline-flex; align-items:center; gap:8px; font-family:'IBM Plex Mono', monospace;
+    font-size:11px; padding:6px 12px; border-radius:100px; border:1px solid var(--border);
+    color:var(--text-dim); margin-bottom:18px;
+  }
+  .role-domain-tag .dot{width:6px; height:6px; border-radius:50%;}
+  .role-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:36px;}
+  @media(max-width:780px){.role-grid{grid-template-columns:1fr;}}
+  .role-card{
+    background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:28px 22px; cursor:pointer; transition:border-color .18s, transform .18s;
+  }
+  .role-card:hover{transform:translateY(-3px); border-color:var(--gold-dim);}
+  .role-card .icon-wrap{
+    width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    background:rgba(227,163,62,0.12); margin-bottom:20px;
+  }
+  .role-card h3{font-family:'Fraunces', serif; font-size:19px; font-weight:600; margin-bottom:9px;}
+  .role-card p{color:var(--text-dim); font-size:13.5px; line-height:1.55;}
+  .role-card .enter{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--gold);
+    margin-top:18px;
+  }
+
+  /* ---------- CHAT VIEW ---------- */
+  #view-chat{align-items:center;}
+  .chat-outer{width:100%; max-width:1040px; padding:0 20px; display:flex; gap:22px; height:100vh;}
+  .chat-shell{flex:1; min-width:0; display:flex; flex-direction:column; height:100vh;}
+  .chat-header{
+    padding:18px 4px 14px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+  }
+  .chat-header-left{display:flex; align-items:center; gap:12px; min-width:0;}
+  .chat-avatar{
+    width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .chat-header-title{font-family:'Fraunces', serif; font-weight:600; font-size:16px; line-height:1.2;}
+  .chat-header-sub{font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--text-faint); margin-top:3px;}
+  .readiness{text-align:right; flex-shrink:0;}
+  .readiness-label{font-family:'IBM Plex Mono', monospace; font-size:10px; color:var(--text-faint); letter-spacing:0.06em; text-transform:uppercase;}
+  .readiness-bar{width:100px; height:5px; border-radius:100px; background:var(--bg-raised); margin-top:6px; overflow:hidden;}
+  .readiness-fill{height:100%; background:var(--teal); border-radius:100px; transition:width .5s ease;}
+  .readiness-pct{font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--teal); margin-top:4px;}
+
+  .capability-strip{
+    display:flex; gap:6px; padding:10px 4px; flex-wrap:wrap; border-bottom:1px solid var(--border);
+  }
+  .cap-pill{
+    font-family:'IBM Plex Mono', monospace; font-size:9.5px; padding:4px 9px; border-radius:100px;
+    background:var(--bg-card); color:var(--text-faint); letter-spacing:0.02em;
+  }
+
+  .chat-messages{flex:1; overflow-y:auto; padding:20px 4px; display:flex; flex-direction:column; gap:16px;}
+  .msg-row{display:flex; flex-direction:column; max-width:82%;}
+  .msg-row.user{align-self:flex-end; align-items:flex-end;}
+  .msg-row.assistant{align-self:flex-start; align-items:flex-start;}
+  .intent-tag{
+    font-family:'IBM Plex Mono', monospace; font-size:9.5px; padding:3px 9px; border-radius:100px;
+    margin-bottom:5px; letter-spacing:0.03em;
+  }
+  .msg{padding:13px 16px; border-radius:14px; font-size:14.5px; line-height:1.55; position:relative;}
+  .msg.assistant{background:var(--bg-card); border:1px solid var(--border); border-bottom-left-radius:4px;}
+  .msg.user{background:var(--gold); color:#171004; border-bottom-right-radius:4px; font-weight:500;}
+  .msg.typing{background:var(--bg-card); border:1px solid var(--border); display:flex; gap:5px; padding:15px 18px;}
+  .typing-dot{width:6px; height:6px; border-radius:50%; background:var(--text-faint); animation:bounce 1.2s infinite;}
+  .typing-dot:nth-child(2){animation-delay:.15s;}
+  .typing-dot:nth-child(3){animation-delay:.3s;}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0); opacity:0.5;} 30%{transform:translateY(-4px); opacity:1;}}
+  .speak-btn{
+    background:none; border:none; color:var(--text-faint); cursor:pointer; margin-top:4px;
+    display:flex; align-items:center; gap:4px; font-family:'IBM Plex Mono', monospace; font-size:10px;
+    padding:2px 0;
+  }
+  .speak-btn:hover{color:var(--teal);}
+
+  .quick-actions{display:flex; gap:8px; padding:10px 4px; flex-wrap:wrap; border-top:1px solid var(--border);}
+  .qa-btn{
+    font-family:'IBM Plex Mono', monospace; font-size:11.5px; padding:8px 13px; border-radius:100px;
+    background:var(--bg-card); border:1px solid var(--border); color:var(--text-dim); cursor:pointer;
+    transition:border-color .15s, color .15s;
+  }
+  .qa-btn:hover{border-color:var(--gold-dim); color:var(--gold);}
+
+  .chat-input-row{
+    padding:12px 4px 22px; display:flex; gap:8px; align-items:flex-end;
+  }
+  .chat-input-row textarea{
+    flex:1; background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
+    color:var(--text); font-family:'Inter', sans-serif; font-size:14.5px; padding:12px 14px;
+    resize:none; max-height:120px; line-height:1.4;
+  }
+  .chat-input-row textarea:focus{outline:none; border-color:var(--gold-dim);}
+  .icon-btn{
+    background:var(--bg-card); border:1px solid var(--border); color:var(--text-dim); width:42px; height:42px; border-radius:11px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    transition:transform .15s, border-color .15s, color .15s;
+  }
+  .icon-btn:hover{border-color:var(--gold-dim); color:var(--gold);}
+  .icon-btn.active{background:var(--gold); border-color:var(--gold); color:#171004;}
+  .icon-btn.listening{animation:pulse 1.1s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(227,163,62,0.5);}50%{box-shadow:0 0 0 8px rgba(227,163,62,0);}}
+  .send-btn{
+    background:var(--gold); border:none; color:#171004; width:42px; height:42px; border-radius:11px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    transition:transform .15s;
+  }
+  .send-btn:hover{transform:scale(1.05);}
+  .send-btn:disabled{opacity:0.4; cursor:default; transform:none;}
+
+  /* ---------- SIDEBAR: RECOMMENDATIONS ---------- */
+  .sidebar{
+    width:250px; flex-shrink:0; padding:18px 0 22px; display:flex; flex-direction:column; gap:14px;
+    overflow-y:auto;
+  }
+  .sidebar-head{font-family:'IBM Plex Mono', monospace; font-size:10.5px; color:var(--text-faint); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:2px;}
+  .rec-card{
+    background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:15px;
+  }
+  .rec-card h4{font-family:'Fraunces', serif; font-size:14.5px; font-weight:600; margin-bottom:6px; color:var(--teal);}
+  .rec-card p{font-size:12.5px; color:var(--text-dim); line-height:1.5;}
+  @media(max-width:880px){ .sidebar{display:none;} }
+
+  svg{display:block;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="topbar-mark" onclick="goTo('brand')"><span class="dot"></span>DealSwarm</div>
+    <div class="crumbs" id="crumbs"></div>
+  </header>
+
+  <!-- ============ BRAND VIEW ============ -->
+  <section id="view-brand" class="view active">
+    <div class="swarm-field" id="swarmField"></div>
+    <div class="hero-inner">
+      <div class="eyebrow">Multi-Agent Negotiation Platform</div>
+      <div class="wordmark">Deal<span class="accent">Swarm</span></div>
+      <p class="tagline">Three loyal agents — one for the seller, one for the buyer, one for the deal itself — negotiating in real time so no single AI has to represent everyone at once.</p>
+      <div class="agent-chips">
+        <div class="agent-chip"><span class="dot" style="background:var(--c-business)"></span>Seller Agent</div>
+        <div class="agent-chip"><span class="dot" style="background:var(--gold)"></span>Platform Keeper</div>
+        <div class="agent-chip"><span class="dot" style="background:var(--c-medicine)"></span>Buyer Agent</div>
+      </div>
+      <div class="feature-strip">
+        <div class="feature-pill">Natural language processing</div>
+        <div class="feature-pill">Task automation</div>
+        <div class="feature-pill">Personalized recommendations</div>
+        <div class="feature-pill">Voice interaction</div>
+      </div>
+      <button class="cta-btn" onclick="goTo('domains')">Enter the marketplace →</button>
+      <div class="brand-footer">TEAM DEALSWARM · OPENSWARM HACKATHON 2026</div>
+    </div>
+  </section>
+
+  <!-- ============ DOMAINS VIEW ============ -->
+  <section id="view-domains" class="view">
+    <div class="section-wrap">
+      <div class="section-head">
+        <h1>Choose a domain</h1>
+        <p>Every deal room is scoped to one industry, so the agents you talk to stay sharp on that domain only.</p>
+      </div>
+      <div class="domain-grid" id="domainGrid"></div>
+    </div>
+  </section>
+
+  <!-- ============ ROLES VIEW ============ -->
+  <section id="view-roles" class="view">
+    <div class="section-wrap">
+      <div class="back-link" onclick="goTo('domains')">← All domains</div>
+      <div class="role-domain-tag" id="roleDomainTag"></div>
+      <div class="section-head" style="margin-bottom:0;">
+        <h1 id="roleHeading">Who are you in this deal?</h1>
+        <p>Pick a side. You'll be connected to a single agent, loyal only to that role — it won't drift into the other side's job.</p>
+      </div>
+      <div class="role-grid" id="roleGrid"></div>
+    </div>
+  </section>
+
+  <!-- ============ CHAT VIEW ============ -->
+  <section id="view-chat" class="view">
+    <div class="chat-outer">
+      <div class="chat-shell">
+        <div class="chat-header">
+          <div class="chat-header-left">
+            <div class="chat-avatar" id="chatAvatar"></div>
+            <div>
+              <div class="chat-header-title" id="chatTitle">Agent</div>
+              <div class="chat-header-sub" id="chatSub">Domain — Role</div>
+            </div>
+          </div>
+          <div class="readiness">
+            <div class="readiness-label">Deal Readiness</div>
+            <div class="readiness-bar"><div class="readiness-fill" id="readinessFill" style="width:12%"></div></div>
+            <div class="readiness-pct" id="readinessPct">12%</div>
+          </div>
+        </div>
+
+        <div class="capability-strip">
+          <div class="cap-pill">🧠 NLP intent detection</div>
+          <div class="cap-pill">⚡ Task automation</div>
+          <div class="cap-pill">◎ Personalized matches</div>
+          <div class="cap-pill">🎙 Voice interaction</div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages"></div>
+
+        <div class="quick-actions" id="quickActions"></div>
+
+        <div class="chat-input-row">
+          <button class="icon-btn" id="micBtn" onclick="toggleMic()" title="Speak your message">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.6"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <textarea id="chatInput" rows="1" placeholder="Type or speak your message…" onkeydown="handleKey(event)"></textarea>
+          <button class="icon-btn" id="voiceReplyBtn" onclick="toggleVoiceReply()" title="Read replies aloud">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M17 8a5 5 0 0 1 0 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 12L20 4L14 20L11 13L4 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:10px; color:var(--text-faint); text-align:center; padding:0 4px 14px;">Chat needs the live Claude artifact preview to reach the agent — it won't respond if opened as a standalone downloaded file.</div>
+      </div>
+
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-head">Recommended for you</div>
+        <div id="recCards"></div>
+      </aside>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   ICONS
+---------------------------------------------------------------- */
+const ICONS = {
+  business: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="18" height="12" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="1.6"/><path d="M3 13h18" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  farming: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 21V9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 9C12 9 6 9 6 4C11 4 12 9 12 9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 13C12 13 18 13 18 8C13 8 12 13 12 13Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`,
+  medicine: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  education: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M2 8l10-4 10 4-10 4-10-4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6 10.5V15c0 1.5 2.5 3 6 3s6-1.5 6-3v-4.5" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  seller: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M20.5 12.5 12.5 20.5a2 2 0 0 1-2.83 0l-6.17-6.17a2 2 0 0 1 0-2.83L11.5 3.5H19a1.5 1.5 0 0 1 1.5 1.5v7.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="15.5" cy="8.5" r="1.3" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  buyer: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6"/><path d="M20 20l-4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  keeper: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`
+};
+
+/* ---------------------------------------------------------------
+   DOMAIN + ROLE DATA
+---------------------------------------------------------------- */
+const DOMAINS = [
+  {
+    id:'business', name:'Business Management', color:'var(--c-business)', icon:ICONS.business,
+    tagline:'Buy, sell, or lease an entire business.',
+    desc:'Retail shops, service companies, and franchises — full ownership transfers and leaseholds.',
+    context:'Deals in this domain involve buying, selling, or leasing an entire business: retail stores, service companies, franchises, or agencies. Typical terms include asking price, revenue multiples, lease-vs-buy structure, staff retention, and transition period.'
+  },
+  {
+    id:'farming', name:'Farming & Agriculture', color:'var(--c-farming)', icon:ICONS.farming,
+    tagline:'Farmland leases and crop-share deals.',
+    desc:'Land leases, crop-share agreements, and equipment sales between growers and operators.',
+    context:'Deals in this domain involve farmland leases, crop-share agreements, and farm equipment sales. Typical terms include per-acre lease rates, crop-share percentages, season length, water rights, and equipment condition.'
+  },
+  {
+    id:'medicine', name:'Medicine & Healthcare', color:'var(--c-medicine)', icon:ICONS.medicine,
+    tagline:'Clinic sales and practice transfers.',
+    desc:'Medical practice sales, clinic leases, and healthcare equipment transfers.',
+    context:'Deals in this domain involve medical practice sales, clinic leases, and healthcare equipment transfers. Typical terms include patient-list valuation, licensing/compliance transfer, equipment condition, and non-compete clauses.'
+  },
+  {
+    id:'education', name:'Education', color:'var(--c-education)', icon:ICONS.education,
+    tagline:'School and training-center deals.',
+    desc:'School acquisitions, training-center transfers, and tutoring franchise deals.',
+    context:'Deals in this domain involve school or training-center acquisitions and tutoring/franchise transfers. Typical terms include enrollment numbers, accreditation transfer, curriculum licensing, and staff/faculty retention.'
+  }
+];
+
+const ROLES = [
+  {
+    id:'seller', name:'Seller Agent', icon:ICONS.seller,
+    desc:'Loyal to you only. Drafts your listing, evaluates incoming offers, and defends your price and terms.',
+    quickActions:[
+      {label:'Draft counter offer', text:"Draft a counter offer to the buyer's last message."},
+      {label:'Request verification', text:"Ask the buyer to verify their funds or provide proof of financing."},
+      {label:'Summarize deal', text:"Summarize where this deal stands so far."}
+    ],
+    persona:(ctx)=>`You are the Seller Agent inside DealSwarm, a multi-agent negotiation platform. You represent ONLY the seller's interests, exclusively within this domain: ${ctx}
+
+Your job: help draft or refine the listing, evaluate offers as they come in, and defend the seller's price and terms with clear, specific reasoning. Be firm but fair — you want the deal to close, but not at the seller's expense. Ask the questions a real seller's agent would ask (asking price, must-haves, walk-away point) if they haven't been given yet.
+
+You are a single, focused agent. Stay strictly inside seller-side negotiation for this domain. If the person asks something unrelated to this deal, briefly redirect them back to the negotiation. Keep replies conversational and under 120 words unless a longer breakdown is genuinely needed.`
+  },
+  {
+    id:'buyer', name:'Buyer Agent', icon:ICONS.buyer,
+    desc:'Loyal to you only. Evaluates listings against your budget and goals, and flags red flags before you commit.',
+    quickActions:[
+      {label:'Propose lower price', text:"Propose a lower price than the current asking terms, with reasoning."},
+      {label:'Ask for financials', text:"Ask the seller for financial statements or proof of revenue."},
+      {label:'Request inspection', text:"Request an inspection or supporting documentation before proceeding further."}
+    ],
+    persona:(ctx)=>`You are the Buyer Agent inside DealSwarm, a multi-agent negotiation platform. You represent ONLY the buyer's interests, exclusively within this domain: ${ctx}
+
+Your job: evaluate listings and offers against the buyer's stated budget and goals, flag anything that looks like a red flag or an inflated number, and negotiate firmly on the buyer's behalf. Ask the questions a real buyer's agent would ask (budget, must-haves, deal-breakers) if they haven't been given yet.
+
+You are a single, focused agent. Stay strictly inside buyer-side negotiation for this domain. If the person asks something unrelated to this deal, briefly redirect them back to the negotiation. Keep replies conversational and under 120 words unless a longer breakdown is genuinely needed.`
+  },
+  {
+    id:'keeper', name:'Platform Keeper', icon:ICONS.keeper,
+    desc:'Neutral referee. Tracks live deal progress, resolves deadlocks, and keeps both sides accountable.',
+    quickActions:[
+      {label:'Check deal readiness', text:"Give me a readiness check on this deal — how close are we to closing?"},
+      {label:'Flag a deadlock', text:"Flag if there's a deadlock here and propose a fair middle ground."},
+      {label:'Summarize both sides', text:"Summarize both sides' positions in this deal so far."}
+    ],
+    persona:(ctx)=>`You are the Platform Keeper (Mediator Agent) inside DealSwarm, a multi-agent negotiation platform. You represent NEITHER side — you are strictly neutral, exclusively within this domain: ${ctx}
+
+Your job: track how close the deal is to closing, surface where the two sides disagree, and — only when there's a genuine deadlock — propose a fair middle ground with your reasoning shown plainly. You keep both sides honest and moving forward.
+
+You are a single, focused agent. Stay strictly inside neutral deal-mediation for this domain. If the person asks something unrelated to this deal, briefly redirect them back to the negotiation. Keep replies conversational and under 120 words unless a longer breakdown is genuinely needed.`
+  }
+];
+
+/* ---------------------------------------------------------------
+   NLP — lightweight client-side intent detection
+   (keyword-based, illustrates the intent-tagging layer live)
+---------------------------------------------------------------- */
+function detectIntent(text){
+  const t = text.toLowerCase();
+  const rules = [
+    { key:/\b(accept|deal|agreed|sounds good|works for me)\b/, label:'Acceptance', color:'var(--teal)' },
+    { key:/\b(reject|decline|walk away|no deal|not interested)\b/, label:'Rejection', color:'#E36E6E' },
+    { key:/\b(counter|instead|lower|higher|propose|offer|willing to pay|asking)\b/, label:'Offer / Counter-offer', color:'var(--gold)' },
+    { key:/\b(verify|proof|document|financials|statement|records|license|accredit)\b/, label:'Verification request', color:'var(--violet)' },
+    { key:/\?|^(what|why|how|when|who|can you|could you)\b/, label:'Question', color:'var(--c-medicine)' }
+  ];
+  for(const r of rules){ if(r.key.test(t)) return { label:r.label, color:r.color }; }
+  return { label:'General', color:'var(--text-faint)' };
+}
+
+/* ---------------------------------------------------------------
+   PERSONALIZED RECOMMENDATIONS
+   (mocked ML-style matches, generated from domain + role)
+---------------------------------------------------------------- */
+function getRecommendations(domain, role){
+  const d = domain.name.toLowerCase();
+  if(role.id === 'buyer'){
+    return [
+      { title:'New listing match', blurb:`A ${d} listing just went live with terms close to what you've described — worth a look before the seller gets other offers.` },
+      { title:'Negotiation tip', blurb:`Buyers in ${d} who requested financials in their first two messages closed ~18% faster.` }
+    ];
+  }
+  if(role.id === 'seller'){
+    return [
+      { title:'Qualified buyer lead', blurb:`A buyer active in ${d} matches your price range and has flagged verified funds.` },
+      { title:'Pricing signal', blurb:`Recent ${d} listings priced within 10% of comparable deals closed about twice as fast.` }
+    ];
+  }
+  return [
+    { title:'Deal needs attention', blurb:`This ${d} deal room has been quiet for a while — consider prompting both sides for an update.` },
+    { title:'Pace benchmark', blurb:`Similar ${d} deals typically reach 70% readiness within about five exchanges.` }
+  ];
+}
+
+/* ---------------------------------------------------------------
+   STATE + NAVIGATION
+---------------------------------------------------------------- */
+let state = { domain:null, role:null, messages:[], readiness:12, voiceReply:false, listening:false };
+let recognition = null;
+
+function goTo(view){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  renderCrumbs(view);
+  window.scrollTo(0,0);
+}
+
+function renderCrumbs(view){
+  const el = document.getElementById('crumbs');
+  if(view==='brand'){ el.innerHTML=''; return; }
+  let parts = [`<span onclick="goTo('domains')">Marketplace</span>`];
+  if(state.domain && (view==='roles'||view==='chat')){
+    parts.push(`<span class="sep">/</span><span onclick="selectDomain('${state.domain.id}')">${state.domain.name}</span>`);
+  }
+  if(state.role && view==='chat'){
+    parts.push(`<span class="sep">/</span><span class="current">${state.role.name}</span>`);
+  } else if(view==='roles'){
+    parts[parts.length-1] = parts[parts.length-1].replace('<span onclick', '<span class="current" onclick');
+  }
+  el.innerHTML = parts.join('');
+}
+
+/* ---------------------------------------------------------------
+   RENDER: DOMAINS
+---------------------------------------------------------------- */
+function renderDomains(){
+  const grid = document.getElementById('domainGrid');
+  grid.innerHTML = DOMAINS.map(d => `
+    <div class="domain-card" onclick="selectDomain('${d.id}')">
+      <div class="icon-wrap" style="background:${d.color}22; color:${d.color}">${d.icon}</div>
+      <h3>${d.name}</h3>
+      <p>${d.desc}</p>
+      <div class="go">${d.tagline} →</div>
+    </div>
+  `).join('') + `
+    <div class="domain-card soon">
+      <div class="icon-wrap" style="background:#5C627022; color:#5C6270">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
+      </div>
+      <h3>More domains</h3>
+      <p>Real estate, logistics, and hospitality deal rooms are coming soon.</p>
+    </div>
+  `;
+}
+
+function selectDomain(id){
+  state.domain = DOMAINS.find(d=>d.id===id);
+  document.getElementById('roleDomainTag').innerHTML = `<span class="dot" style="background:${state.domain.color}"></span>${state.domain.name}`;
+  document.getElementById('roleHeading').textContent = `Who are you in this ${state.domain.name.toLowerCase()} deal?`;
+  renderRoles();
+  goTo('roles');
+}
+
+/* ---------------------------------------------------------------
+   RENDER: ROLES
+---------------------------------------------------------------- */
+function renderRoles(){
+  const grid = document.getElementById('roleGrid');
+  grid.innerHTML = ROLES.map(r => `
+    <div class="role-card" onclick="selectRole('${r.id}')">
+      <div class="icon-wrap" style="color:var(--gold)">${r.icon}</div>
+      <h3>${r.name}</h3>
+      <p>${r.desc}</p>
+      <div class="enter">Enter as ${r.name} →</div>
+    </div>
+  `).join('');
+}
+
+function selectRole(id){
+  state.role = ROLES.find(r=>r.id===id);
+  state.messages = [];
+  state.readiness = 12;
+  document.getElementById('chatAvatar').innerHTML = state.role.icon;
+  document.getElementById('chatAvatar').style.background = state.domain.color + '22';
+  document.getElementById('chatAvatar').style.color = state.domain.color;
+  document.getElementById('chatTitle').textContent = state.role.name;
+  document.getElementById('chatSub').textContent = `${state.domain.name} deal room`;
+  updateReadiness();
+  renderQuickActions();
+  renderRecommendations();
+
+  const greetings = {
+    seller: `I'm your Seller Agent for ${state.domain.name.toLowerCase()}. Tell me what you're selling or leasing and your asking price, and I'll help you position it — and defend it when offers come in.`,
+    buyer: `I'm your Buyer Agent for ${state.domain.name.toLowerCase()}. Tell me your budget and what you're looking for, and I'll evaluate listings and negotiate on your behalf.`,
+    keeper: `I'm the Platform Keeper for this ${state.domain.name.toLowerCase()} deal room. I don't take sides — describe where things stand and I'll help track progress or break a deadlock.`
+  };
+  state.messages.push({role:'assistant', content:greetings[state.role.id]});
+  renderMessages();
+  goTo('chat');
+  document.getElementById('chatInput').focus();
+}
+
+function renderQuickActions(){
+  const el = document.getElementById('quickActions');
+  el.innerHTML = state.role.quickActions.map(qa =>
+    `<button class="qa-btn" onclick="runQuickAction('${qa.text.replace(/'/g,"\\'")}')">${qa.label}</button>`
+  ).join('');
+}
+
+function runQuickAction(text){
+  document.getElementById('chatInput').value = text;
+  sendMessage();
+}
+
+function renderRecommendations(){
+  const recs = getRecommendations(state.domain, state.role);
+  document.getElementById('recCards').innerHTML = recs.map(r => `
+    <div class="rec-card">
+      <h4>${r.title}</h4>
+      <p>${r.blurb}</p>
+    </div>
+  `).join('');
+}
+
+/* ---------------------------------------------------------------
+   CHAT
+---------------------------------------------------------------- */
+function renderMessages(){
+  const el = document.getElementById('chatMessages');
+  el.innerHTML = state.messages.map((m,i) => {
+    if(m.role === 'user'){
+      const intent = detectIntent(m.content);
+      return `<div class="msg-row user">
+        <div class="intent-tag" style="background:${intent.color}22; color:${intent.color}">${intent.label}</div>
+        <div class="msg user">${escapeHtml(m.content)}</div>
+      </div>`;
+    }
+    return `<div class="msg-row assistant">
+      <div class="msg assistant">${escapeHtml(m.content)}</div>
+      <button class="speak-btn" onclick="speakText(${i})">🔊 Play</button>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML.replace(/\n/g,'<br>');
+}
+
+function handleKey(e){
+  if(e.key==='Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function updateReadiness(){
+  document.getElementById('readinessFill').style.width = state.readiness + '%';
+  document.getElementById('readinessPct').textContent = state.readiness + '%';
+}
+
+async function sendMessage(){
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+
+  state.messages.push({role:'user', content:text});
+  renderMessages();
+
+  const el = document.getElementById('chatMessages');
+  const typingEl = document.createElement('div');
+  typingEl.className = 'msg typing';
+  typingEl.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  el.appendChild(typingEl);
+  el.scrollTop = el.scrollHeight;
+
+  try{
+    const systemPrompt = state.role.persona(state.domain.context);
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: state.messages.map(m => ({role:m.role, content:m.content}))
+      })
+    });
+    const data = await response.json();
+
+    if(!response.ok || data.error){
+      const reason = (data.error && data.error.message) ? data.error.message : `HTTP ${response.status}`;
+      console.error('DealSwarm API error:', data);
+      typingEl.remove();
+      state.messages.push({role:'assistant', content:`I hit an API error and can't respond right now (${reason}). If you're viewing this file outside the live Claude preview, that's expected — this prototype's chat only works inside the artifact preview, since that's what supplies API access. Open it from the chat panel rather than the downloaded file.`});
+      renderMessages();
+      return;
+    }
+
+    const reply = (data.content || []).map(b => b.type==='text' ? b.text : '').join('').trim();
+    typingEl.remove();
+    if(!reply){
+      state.messages.push({role:'assistant', content:"I got an empty response back — try rephrasing your last message."});
+      renderMessages();
+      return;
+    }
+    state.messages.push({role:'assistant', content:reply});
+    state.readiness = Math.min(95, state.readiness + 8 + Math.floor(Math.random()*10));
+    updateReadiness();
+    renderMessages();
+    if(state.voiceReply) speakText(state.messages.length - 1);
+  }catch(err){
+    console.error('DealSwarm fetch failed:', err);
+    typingEl.remove();
+    state.messages.push({role:'assistant', content:`The request itself failed before reaching the API (${err.message}). This usually means the page is being opened outside the live Claude artifact preview — reopen it from the chat panel here rather than the saved .html file.`});
+    renderMessages();
+  }finally{
+    btn.disabled = false;
+    input.focus();
+  }
+}
+
+/* ---------------------------------------------------------------
+   VOICE INTERACTION
+   - Speech-to-text: fills the input from the mic
+   - Text-to-speech: reads any assistant message aloud
+---------------------------------------------------------------- */
+function toggleMic(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const micBtn = document.getElementById('micBtn');
+  if(!SR){
+    alert("Voice input isn't supported in this browser. Try Chrome on desktop or Android.");
+    return;
+  }
+  if(state.listening){
+    recognition && recognition.stop();
+    return;
+  }
+  recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => { state.listening = true; micBtn.classList.add('listening','active'); };
+  recognition.onend = () => { state.listening = false; micBtn.classList.remove('listening','active'); };
+  recognition.onerror = () => { state.listening = false; micBtn.classList.remove('listening','active'); };
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    const input = document.getElementById('chatInput');
+    input.value = (input.value ? input.value + ' ' : '') + transcript;
+    input.focus();
+  };
+  recognition.start();
+}
+
+function toggleVoiceReply(){
+  state.voiceReply = !state.voiceReply;
+  document.getElementById('voiceReplyBtn').classList.toggle('active', state.voiceReply);
+}
+
+function speakText(index){
+  if(!window.speechSynthesis){
+    alert("Voice playback isn't supported in this browser.");
+    return;
+  }
+  const msg = state.messages[index];
+  if(!msg) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(msg.content);
+  utter.rate = 1.02;
+  utter.pitch = 1;
+  window.speechSynthesis.speak(utter);
+}
+
+/* ---------------------------------------------------------------
+   SWARM PARTICLE FIELD (brand hero)
+---------------------------------------------------------------- */
+function initSwarm(){
+  const field = document.getElementById('swarmField');
+  const colors = ['#E3A33E','#7C93F0','#5FC9D6','#7FBE6A','#B394E0'];
+  const count = 26;
+  let html = '';
+  for(let i=0;i<count;i++){
+    const size = 3 + Math.random()*5;
+    const startX = Math.random()*100;
+    const startY = Math.random()*100;
+    const dur = 14 + Math.random()*18;
+    const delay = Math.random()*-20;
+    const color = colors[i % colors.length];
+    html += `<div class="particle" style="
+      width:${size}px; height:${size}px; background:${color};
+      left:${startX}%; top:${startY}%;
+      animation: orbit${i%4} ${dur}s ease-in-out ${delay}s infinite;
+    "></div>`;
+  }
+  field.innerHTML = html;
+
+  const styleEl = document.createElement('style');
+  styleEl.textContent = `
+    @keyframes orbit0{0%,100%{transform:translate(0,0);}50%{transform:translate(40px,-30px);}}
+    @keyframes orbit1{0%,100%{transform:translate(0,0);}50%{transform:translate(-35px,25px);}}
+    @keyframes orbit2{0%,100%{transform:translate(0,0);}50%{transform:translate(25px,35px);}}
+    @keyframes orbit3{0%,100%{transform:translate(0,0);}50%{transform:translate(-45px,-20px);}}
+  `;
+  document.head.appendChild(styleEl);
+}
+
+/* ---------------------------------------------------------------
+   INIT
+---------------------------------------------------------------- */
+initSwarm();
+renderDomains();
+renderCrumbs('brand');
+</script>
+</body>
+</html>
